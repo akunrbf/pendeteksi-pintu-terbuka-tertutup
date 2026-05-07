@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AegisMask: Edge Checkpoint</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 5px; }
+
+        .btn-init {
+            background-color: #FF3B30;
+            color: white;
+            border: 2px solid #fff;
+            padding: 10px 30px;
+            font-size: 20px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            transition: 0.2s;
+        }
+
+        .btn-init:hover { background-color: #cc2f26; }
+        .btn-init:disabled { background-color: #555; cursor: not-allowed; }
+
+        .status-panel {
+            margin-bottom: 25px;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid #555;
+            width: 800px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .dashboard {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 640px;
+            height: 480px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            object-fit: fill; 
+        }
+
+        canvas#overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 640px; 
+            height: 480px; 
+            pointer-events: none; 
+            z-index: 9999;
+        }
+
+        .log-panel {
+            width: 300px;
+            height: 480px;
+            background-color: #1e1e1e;
+            border: 2px solid #555;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .log-entry {
+            border: 2px solid #FF3B30;
+            border-radius: 5px;
+            padding: 5px;
+            background-color: #330000;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-entry img {
+            width: 100%;
+            border-radius: 3px;
+        }
+
+        .log-entry p {
+            margin: 5px 0 0 0;
+            font-size: 12px;
+            color: #ffcccc;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🛡️ AEGIS MASK: Edge Checkpoint</h1>
+    <p>Local WebAssembly Inference | Active Web Telemetry</p>
+
+    <button id="btn-init" class="btn-init">INITIALIZE SYSTEM</button>
+
+    <div class="status-panel" id="status-panel">OFFLINE: AWAITING INITIALIZATION</div>
+
+    <div class="dashboard">
+        <div class="camera-container">
+            <video id="webcam" playsinline muted></video>
+            <canvas id="overlay" width="640" height="480"></canvas>
+        </div>
+        
+        <div class="log-panel" id="log-panel">
+            <h3 style="margin-top: 0; text-align: center; border-bottom: 1px solid #555; padding-bottom: 5px;">VIOLATION LOG</h3>
+        </div>
+    </div>
+
+    <!-- Hidden processor canvas -->
+    <canvas id="processor" width="640" height="640" style="display:none;"></canvas>
+
+    <script src="app.js"></script>
+</body>
+</html>
