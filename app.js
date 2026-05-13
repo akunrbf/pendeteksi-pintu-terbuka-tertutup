@@ -1,540 +1,250 @@
-const video = document.getElementById('webcam');
-const overlay = document.getElementById('overlay');
-const ctxOverlay = overlay.getContext('2d');
+// ================= ELEMENT =================
+const video=document.getElementById('webcam');
+const overlay=document.getElementById('overlay');
+const ctxOverlay=overlay.getContext('2d');
 
-const processor = document.getElementById('processor');
-const ctxProcessor = processor.getContext('2d', {
-    willReadFrequently: true
-});
+const processor=document.getElementById('processor');
+const ctxProcessor=processor.getContext('2d',{willReadFrequently:true});
 
-const statusPanel = document.getElementById('status-panel');
-const logPanel = document.getElementById('log-panel');
-const initBtn = document.getElementById('btn-init');
+const statusPanel=document.getElementById('status-panel');
+const logPanel=document.getElementById('log-panel');
+const initBtn=document.getElementById('btn-init');
 
-// =========================
-// AUDIO
-// =========================
-const alarmSound = new Audio(
-    'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
+// ================= AUDIO =================
+const alarmSound=new Audio(
+'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
 );
 
-const successSound = new Audio(
-    'https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'
+const successSound=new Audio(
+'https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'
 );
 
-let currentState = "AWAITING";
+let currentState="AWAITING";
+let session=null;
 
-// =========================
-// MODEL
-// =========================
-let session;
+// ================= MODEL CONFIG =================
+const TARGET_SIZE=640;
+const CONFIDENCE_THRESHOLD=0.25;
+const IOU_THRESHOLD=0.4;
 
-const TARGET_SIZE = 640;
-const CONFIDENCE_THRESHOLD = 0.25;
-const IOU_THRESHOLD = 0.4;
+// ================= INIT =================
+initBtn.addEventListener('click',async()=>{
 
-// =========================
-// BUTTON INIT
-// =========================
-initBtn.addEventListener('click', async () => {
+initBtn.disabled=true;
+initBtn.innerText="BOOTING...";
 
-    initBtn.disabled = true;
-    initBtn.innerText = "BOOTING...";
+if(Notification.permission!=="granted")
+await Notification.requestPermission();
 
-    // notification permission
-    if ("Notification" in window &&
-        Notification.permission !== "granted") {
-
-        await Notification.requestPermission();
-    }
-
-    alarmSound.load();
-    successSound.load();
-
-    loadModel();
+await loadModel();
 });
 
-// =========================
-// LOAD MODEL
-// =========================
-async function loadModel() {
+// ================= LOAD MODEL =================
+async function loadModel(){
 
-    try {
+ort.env.wasm.wasmPaths=
+'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
-        ort.env.wasm.wasmPaths =
-            'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+session=await ort.InferenceSession.create(
+'./best.onnx',
+{
+executionProviders:['webgl','wasm'],
+graphOptimizationLevel:'all'
+});
 
-        const numCores =
-            navigator.hardwareConcurrency || 4;
-
-        ort.env.wasm.numThreads =
-            Math.min(4, numCores);
-
-        session = await ort.InferenceSession.create(
-            './best.onnx',
-            {
-                executionProviders: ['webgl', 'wasm'],
-                graphOptimizationLevel: 'all'
-            }
-        );
-
-        statusPanel.innerText =
-            "STANDBY: CAMERA INITIALIZATION";
-
-        startCamera();
-
-    } catch (e) {
-
-        console.error(e);
-
-        statusPanel.innerText =
-            "SYSTEM FAILURE: MODEL ERROR";
-
-        statusPanel.style.borderColor = "#ff0000";
-    }
+statusPanel.innerText="MODEL READY";
+startCamera();
 }
 
-// =========================
-// START CAMERA
-// =========================
-async function startCamera() {
+// ================= CAMERA =================
+async function startCamera(){
 
-    try {
+const stream=await navigator.mediaDevices.getUserMedia({
+video:{width:640,height:480}
+});
 
-        const stream =
-            await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                },
-                audio: false
-            });
+video.srcObject=stream;
 
-        video.srcObject = stream;
-
-        video.onloadedmetadata = async () => {
-
-            await video.play();
-
-            statusPanel.innerText =
-                "AWAITING DOOR DETECTION...";
-
-            initBtn.style.display = "none";
-
-            requestAnimationFrame(processFrame);
-        };
-
-    } catch (e) {
-
-        console.error(e);
-
-        statusPanel.innerText =
-            "CAMERA ACCESS DENIED";
-
-        statusPanel.style.borderColor = "#ff0000";
-    }
+video.onloadedmetadata=()=>{
+video.play();
+requestAnimationFrame(processFrame);
+};
 }
 
-// =========================
-// LOG + NOTIFICATION
-// =========================
-function logDoorEvent() {
+// ================= IOU =================
+function calculateIoU(a,b){
 
-    const captureCanvas =
-        document.createElement('canvas');
+const xA=Math.max(a.x,b.x);
+const yA=Math.max(a.y,b.y);
+const xB=Math.min(a.x+a.w,b.x+b.w);
+const yB=Math.min(a.y+a.h,b.y+b.h);
 
-    captureCanvas.width = video.videoWidth;
-    captureCanvas.height = video.videoHeight;
+const inter=Math.max(0,xB-xA)*Math.max(0,yB-yA);
 
-    const captureCtx =
-        captureCanvas.getContext('2d');
-
-    captureCtx.drawImage(
-        video,
-        0,
-        0,
-        captureCanvas.width,
-        captureCanvas.height
-    );
-
-    const dataUrl =
-        captureCanvas.toDataURL(
-            'image/jpeg',
-            0.8
-        );
-
-    const timestamp =
-        new Date().toLocaleTimeString();
-
-    // sidebar log
-    const entry =
-        document.createElement('div');
-
-    entry.className = 'log-entry';
-
-    entry.innerHTML = `
-        <img src="${dataUrl}">
-        <p>
-            🚪 PINTU TERBUKA
-            <br>
-            ${timestamp}
-        </p>
-    `;
-
-    logPanel.insertBefore(
-        entry,
-        logPanel.children[1]
-    );
-
-    // notification
-    if ("Notification" in window &&
-        Notification.permission === "granted") {
-
-        new Notification(
-            "🚪 STATUS PINTU",
-            {
-                body:
-                    `Pintu terbuka terdeteksi pada ${timestamp}`,
-                icon: dataUrl,
-                vibrate: [200, 100, 200]
-            }
-        );
-    }
+return inter/(a.w*a.h+b.w*b.h-inter);
 }
 
-// =========================
-// IOU
-// =========================
-function calculateIoU(box1, box2) {
+// ================= NMS =================
+function nonMaxSuppression(boxes){
 
-    const xA = Math.max(box1.x, box2.x);
-    const yA = Math.max(box1.y, box2.y);
+boxes.sort((a,b)=>b.score-a.score);
 
-    const xB = Math.min(
-        box1.x + box1.w,
-        box2.x + box2.w
-    );
+const result=[];
 
-    const yB = Math.min(
-        box1.y + box1.h,
-        box2.y + box2.h
-    );
+while(boxes.length){
+const best=boxes.shift();
+result.push(best);
 
-    const intersectionArea =
-        Math.max(0, xB - xA) *
-        Math.max(0, yB - yA);
-
-    return intersectionArea /
-        (
-            (box1.w * box1.h) +
-            (box2.w * box2.h) -
-            intersectionArea
-        );
+boxes=boxes.filter(
+b=>calculateIoU(best,b)<IOU_THRESHOLD
+);
 }
 
-// =========================
-// NMS
-// =========================
-function nonMaxSuppression(boxes, iouThreshold) {
-
-    boxes.sort((a, b) =>
-        b.score - a.score
-    );
-
-    const result = [];
-
-    while (boxes.length > 0) {
-
-        const current = boxes.shift();
-
-        result.push(current);
-
-        boxes = boxes.filter(box =>
-            calculateIoU(current, box)
-            < iouThreshold
-        );
-    }
-
-    return result;
+return result;
 }
 
-// =========================
-// MAIN LOOP
-// =========================
-async function processFrame() {
-
-    if (!session) return;
-
-    // resize to 640
-    ctxProcessor.drawImage(
-        video,
-        0,
-        0,
-        TARGET_SIZE,
-        TARGET_SIZE
-    );
-
-    const imageData =
-        ctxProcessor.getImageData(
-            0,
-            0,
-            TARGET_SIZE,
-            TARGET_SIZE
-        ).data;
-
-    // convert to tensor
-    const float32Data =
-        new Float32Array(
-            3 * TARGET_SIZE * TARGET_SIZE
-        );
-
-    for (let i = 0; i < TARGET_SIZE * TARGET_SIZE; i++) {
-
-        float32Data[i] =
-            imageData[i * 4] / 255.0;
-
-        float32Data[
-            i + TARGET_SIZE * TARGET_SIZE
-        ] =
-            imageData[i * 4 + 1] / 255.0;
-
-        float32Data[
-            i + 2 * TARGET_SIZE * TARGET_SIZE
-        ] =
-            imageData[i * 4 + 2] / 255.0;
-    }
-
-    const inputTensor =
-        new ort.Tensor(
-            'float32',
-            float32Data,
-            [1, 3, TARGET_SIZE, TARGET_SIZE]
-        );
-
-    // inference
-    const results =
-        await session.run({
-            [session.inputNames[0]]:
-                inputTensor
-        });
-
-    const output =
-        results[
-            session.outputNames[0]
-        ].data;
-
-    let rawBoxes = [];
-
-    const elements = 8400;
-
-    // =========================
-    // PARSE YOLO OUTPUT
-    // =========================
-    for (let i = 0; i < elements; i++) {
-
-        let x = output[i];
-        let y = output[i + elements];
-        let w = output[i + 2 * elements];
-        let h = output[i + 3 * elements];
-
-        // class 0 = pintu tertutup
-        // class 1 = pintu terbuka
-        const scoreClosed =
-            output[i + 4 * elements];
-
-        const scoreOpen =
-            output[i + 5 * elements];
-
-        const maxScore =
-            Math.max(scoreClosed, scoreOpen);
-
-        if (maxScore > CONFIDENCE_THRESHOLD) {
-
-            if (w <= 1.5 && h <= 1.5) {
-
-                x *= TARGET_SIZE;
-                y *= TARGET_SIZE;
-                w *= TARGET_SIZE;
-                h *= TARGET_SIZE;
-            }
-
-            rawBoxes.push({
-
-                x: x - w / 2,
-                y: y - h / 2,
-                w: w,
-                h: h,
-
-                score: maxScore,
-
-                classId:
-                    scoreOpen > scoreClosed
-                        ? 1
-                        : 0
-            });
-        }
-    }
-
-    const finalBoxes =
-        nonMaxSuppression(
-            rawBoxes,
-            IOU_THRESHOLD
-        );
-
-    ctxOverlay.clearRect(
-        0,
-        0,
-        overlay.width,
-        overlay.height
-    );
-
-    let isDoorOpen = false;
-
-    // =========================
-    // DRAW
-    // =========================
-    if (finalBoxes.length > 0) {
+// ================= LOG =================
+function logDoorEvent(){
 
-        finalBoxes.forEach(box => {
+const c=document.createElement('canvas');
+c.width=video.videoWidth;
+c.height=video.videoHeight;
 
-            const scaleX =
-                overlay.width / TARGET_SIZE;
+c.getContext('2d').drawImage(video,0,0);
 
-            const scaleY =
-                overlay.height / TARGET_SIZE;
+const img=c.toDataURL('image/jpeg');
 
-            const scaledX =
-                box.x * scaleX;
+const div=document.createElement('div');
+div.className='log-entry';
 
-            const scaledY =
-                box.y * scaleY;
+div.innerHTML=`
+<img src="${img}">
+<p>🚪 PINTU TERBUKA<br>
+${new Date().toLocaleTimeString()}
+</p>`;
 
-            const scaledW =
-                box.w * scaleX;
+logPanel.prepend(div);
 
-            const scaledH =
-                box.h * scaleY;
+if(Notification.permission==="granted"){
+new Notification("Pintu Terbuka!",{icon:img});
+}
+}
 
-            if (box.classId === 1) {
-                isDoorOpen = true;
-            }
+// ================= MAIN LOOP =================
+async function processFrame(){
 
-            const color =
-                box.classId === 1
-                    ? '#FF3B30'
-                    : '#34C759';
+if(!session)return;
 
-            const labelText =
-                box.classId === 1
-                    ? `PINTU TERBUKA ${(box.score * 100).toFixed(1)}%`
-                    : `PINTU TERTUTUP ${(box.score * 100).toFixed(1)}%`;
+// resize
+ctxProcessor.drawImage(video,0,0,TARGET_SIZE,TARGET_SIZE);
 
-            // box
-            ctxOverlay.strokeStyle = color;
-            ctxOverlay.lineWidth = 4;
+const data=
+ctxProcessor.getImageData(0,0,TARGET_SIZE,TARGET_SIZE).data;
 
-            ctxOverlay.strokeRect(
-                scaledX,
-                scaledY,
-                scaledW,
-                scaledH
-            );
+// tensor
+const input=new Float32Array(3*TARGET_SIZE*TARGET_SIZE);
 
-            // label bg
-            ctxOverlay.font =
-                'bold 18px monospace';
+for(let i=0;i<TARGET_SIZE*TARGET_SIZE;i++){
 
-            const textWidth =
-                ctxOverlay.measureText(
-                    labelText
-                ).width;
+input[i]=data[i*4]/255;
+input[i+TARGET_SIZE*TARGET_SIZE]=data[i*4+1]/255;
+input[i+2*TARGET_SIZE*TARGET_SIZE]=data[i*4+2]/255;
+}
 
-            ctxOverlay.fillStyle = color;
+const tensor=new ort.Tensor(
+'float32',
+input,
+[1,3,TARGET_SIZE,TARGET_SIZE]
+);
 
-            ctxOverlay.fillRect(
-                scaledX - 2,
-                scaledY - 28,
-                textWidth + 12,
-                28
-            );
+const output=
+(await session.run({
+[session.inputNames[0]]:tensor
+}))[session.outputNames[0]].data;
 
-            // label text
-            ctxOverlay.fillStyle =
-                '#FFFFFF';
+const ELEMENTS=8400;
+let boxes=[];
 
-            ctxOverlay.fillText(
-                labelText,
-                scaledX + 4,
-                scaledY - 8
-            );
-        });
+// ===== PARSE YOLO =====
+for(let i=0;i<ELEMENTS;i++){
 
-        // =========================
-        // GLOBAL STATUS
-        // =========================
-        if (isDoorOpen) {
+let x=output[i];
+let y=output[i+ELEMENTS];
+let w=output[i+2*ELEMENTS];
+let h=output[i+3*ELEMENTS];
 
-            statusPanel.innerText =
-                "🚪 WARNING: PINTU TERBUKA";
+const closed=output[i+4*ELEMENTS];
+const open=output[i+5*ELEMENTS];
 
-            statusPanel.style.backgroundColor =
-                "#4a0000";
+const score=Math.max(closed,open);
+if(score<CONFIDENCE_THRESHOLD)continue;
 
-            statusPanel.style.borderColor =
-                "#FF3B30";
+x*=TARGET_SIZE;
+y*=TARGET_SIZE;
+w*=TARGET_SIZE;
+h*=TARGET_SIZE;
 
-            statusPanel.style.color =
-                "#ffcccc";
+boxes.push({
+x:x-w/2,
+y:y-h/2,
+w,
+h,
+score,
+classId:open>closed?1:0
+});
+}
 
-            if (currentState !== "OPEN") {
+boxes=nonMaxSuppression(boxes);
 
-                alarmSound.currentTime = 0;
-                alarmSound.play();
+ctxOverlay.clearRect(0,0,640,480);
 
-                logDoorEvent();
+let isDoorOpen=false;
 
-                currentState = "OPEN";
-            }
+boxes.forEach(box=>{
 
-        } else {
+const sx=box.x*(640/TARGET_SIZE);
+const sy=box.y*(480/TARGET_SIZE);
+const sw=box.w*(640/TARGET_SIZE);
+const sh=box.h*(480/TARGET_SIZE);
 
-            statusPanel.innerText =
-                "🔒 PINTU TERTUTUP AMAN";
+if(box.classId===1)isDoorOpen=true;
 
-            statusPanel.style.backgroundColor =
-                "#003300";
+ctxOverlay.strokeStyle=
+box.classId?'#FF3B30':'#34C759';
 
-            statusPanel.style.borderColor =
-                "#34C759";
+ctxOverlay.lineWidth=4;
+ctxOverlay.strokeRect(sx,sy,sw,sh);
 
-            statusPanel.style.color =
-                "#ccffcc";
+ctxOverlay.fillStyle=
+box.classId?'#FF3B30':'#34C759';
 
-            if (currentState !== "CLOSED") {
+ctxOverlay.fillText(
+box.classId?'OPEN':'CLOSED',
+sx,
+sy-5
+);
+});
 
-                successSound.currentTime = 0;
-                successSound.play();
+// ===== STATUS =====
+if(isDoorOpen){
 
-                currentState = "CLOSED";
-            }
-        }
+statusPanel.innerText="🚪 WARNING: PINTU TERBUKA";
 
-    } else {
+if(currentState!=="OPEN"){
+alarmSound.play();
+logDoorEvent();
+currentState="OPEN";
+}
 
-        statusPanel.innerText =
-            "AWAITING DOOR DETECTION...";
+}else{
 
-        statusPanel.style.backgroundColor =
-            "transparent";
+statusPanel.innerText="🔒 PINTU TERTUTUP";
 
-        statusPanel.style.borderColor =
-            "#555";
+if(currentState!=="CLOSED"){
+successSound.play();
+currentState="CLOSED";
+}
+}
 
-        statusPanel.style.color =
-            "#ffffff";
-
-        currentState = "AWAITING";
-    }
-
-    requestAnimationFrame(processFrame);
+requestAnimationFrame(processFrame);
 }
