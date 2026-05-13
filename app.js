@@ -24,7 +24,7 @@ let session=null;
 
 // ================= MODEL CONFIG =================
 const TARGET_SIZE=640;
-const CONFIDENCE_THRESHOLD=0.15;
+const CONFIDENCE_THRESHOLD=0.9;
 const IOU_THRESHOLD=0.4;
 
 // ================= INIT =================
