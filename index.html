@@ -1,157 +1,204 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DoorGuard: Status Pintu</title>
-    
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-    
-    <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: monospace;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
 
-        h1 { margin-bottom: 5px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 
-        .btn-init {
-            background-color: #2196F3;
-            color: white;
-            border: 2px solid #fff;
-            padding: 10px 30px;
-            font-size: 20px;
-            font-family: monospace;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            transition: 0.2s;
-        }
+<title>DoorGuard AI Security</title>
 
-        .btn-init:hover { background-color: #1976D2; }
-        .btn-init:disabled { background-color: #555; cursor: not-allowed; }
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 
-        .status-panel {
-            margin-bottom: 25px;
-            padding: 15px 30px;
-            border-radius: 5px;
-            font-size: 24px;
-            font-weight: bold;
-            text-align: center;
-            border: 2px solid #555;
-            width: 800px;
-            transition: all 0.2s ease-in-out;
-        }
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Inter:wght@300;500&display=swap" rel="stylesheet">
 
-        .dashboard {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
+<style>
 
-        .camera-container {
-            position: relative;
-            width: 640px;
-            height: 480px;
-        }
+body{
+margin:0;
+background:
+radial-gradient(circle at top,#0b1d2a,#05080c);
+color:white;
+font-family:'Inter',sans-serif;
+display:flex;
+flex-direction:column;
+align-items:center;
+min-height:100vh;
+}
 
-        video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 640px;
-            height: 480px;
-            border: 2px solid #555;
-            border-radius: 8px;
-            object-fit: fill;
-        }
+/* ===== HEADER ===== */
 
-        canvas#overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 640px;
-            height: 480px;
-            pointer-events: none;
-            z-index: 9999;
-        }
+.header{
+width:100%;
+padding:20px;
+text-align:center;
+background:rgba(0,0,0,0.4);
+backdrop-filter:blur(12px);
+border-bottom:1px solid #1f2d3a;
+}
 
-        .log-panel {
-            width: 300px;
-            height: 480px;
-            background-color: #1e1e1e;
-            border: 2px solid #555;
-            border-radius: 8px;
-            padding: 10px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
+.header h1{
+font-family:'Orbitron';
+letter-spacing:2px;
+margin:0;
+color:#00e5ff;
+}
 
-        .log-entry {
-            border: 2px solid #2196F3;
-            border-radius: 5px;
-            padding: 5px;
-            background-color: #001933;
-            animation: fadeIn 0.3s ease-in-out;
-        }
+/* ===== BUTTON ===== */
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+.btn-init{
+margin:20px;
+padding:12px 40px;
+font-size:18px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+background:linear-gradient(45deg,#00e5ff,#00ffa6);
+color:#000;
+font-weight:bold;
+transition:.3s;
+box-shadow:0 0 15px #00e5ff88;
+}
 
-        .log-entry img {
-            width: 100%;
-            border-radius: 3px;
-        }
+.btn-init:hover{
+transform:scale(1.05);
+}
 
-        .log-entry p {
-            margin: 5px 0 0 0;
-            font-size: 12px;
-            color: #cce6ff;
-            text-align: center;
-        }
-    </style>
+/* ===== STATUS ===== */
+
+.status-panel{
+padding:15px 30px;
+border-radius:10px;
+margin-bottom:20px;
+font-size:22px;
+font-weight:bold;
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(10px);
+border:1px solid #00e5ff55;
+width:900px;
+text-align:center;
+}
+
+/* ===== DASHBOARD ===== */
+
+.dashboard{
+display:flex;
+gap:25px;
+}
+
+/* ===== CAMERA CARD ===== */
+
+.camera-card{
+background:rgba(255,255,255,0.05);
+border-radius:15px;
+padding:15px;
+box-shadow:0 0 25px #000;
+backdrop-filter:blur(12px);
+}
+
+.camera-container{
+position:relative;
+width:640px;
+height:480px;
+}
+
+video{
+position:absolute;
+width:640px;
+height:480px;
+border-radius:10px;
+object-fit:cover;
+}
+
+canvas#overlay{
+position:absolute;
+width:640px;
+height:480px;
+pointer-events:none;
+}
+
+/* ===== LOG PANEL ===== */
+
+.log-panel{
+width:320px;
+height:510px;
+overflow-y:auto;
+border-radius:15px;
+padding:15px;
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(12px);
+box-shadow:0 0 20px #000;
+}
+
+.log-panel h3{
+margin-top:0;
+text-align:center;
+color:#00e5ff;
+font-family:'Orbitron';
+}
+
+/* ===== LOG ENTRY ===== */
+
+.log-entry{
+background:#021a24;
+border:1px solid #00e5ff55;
+border-radius:10px;
+padding:6px;
+animation:fade .3s ease;
+}
+
+.log-entry img{
+width:100%;
+border-radius:6px;
+}
+
+.log-entry p{
+font-size:12px;
+text-align:center;
+color:#aeefff;
+}
+
+@keyframes fade{
+from{opacity:0;transform:translateY(-10px)}
+to{opacity:1}
+}
+
+</style>
+
 </head>
+
 <body>
 
-    <h1>🚪 DOORGUARD: Deteksi Pintu</h1>
-    <p>Monitoring Status Pintu Terbuka & Tertutup</p>
+<div class="header">
+<h1>🚪 DOORGUARD AI SECURITY</h1>
+<p>Real-Time Door Monitoring System</p>
+</div>
 
-    <button id="btn-init" class="btn-init">
-        AKTIFKAN SISTEM
-    </button>
+<button id="btn-init" class="btn-init">
+AKTIFKAN SISTEM
+</button>
 
-    <div class="status-panel" id="status-panel">
-        SISTEM OFFLINE — MENUNGGU AKTIVASI
-    </div>
+<div id="status-panel" class="status-panel">
+SYSTEM OFFLINE — MENUNGGU AKTIVASI
+</div>
 
-    <div class="dashboard">
-        <div class="camera-container">
-            <video id="webcam" playsinline muted></video>
-            <canvas id="overlay" width="640" height="480"></canvas>
-        </div>
-        
-        <div class="log-panel" id="log-panel">
-            <h3 style="margin-top: 0; text-align: center; border-bottom: 1px solid #555; padding-bottom: 5px;">
-                LOG STATUS PINTU
-            </h3>
-        </div>
-    </div>
+<div class="dashboard">
 
-    <!-- Hidden processor canvas -->
-    <canvas id="processor" width="640" height="640" style="display:none;"></canvas>
+<div class="camera-card">
+<div class="camera-container">
+<video id="webcam" playsinline muted></video>
+<canvas id="overlay" width="640" height="480"></canvas>
+</div>
+</div>
 
-    <script src="app.js"></script>
+<div class="log-panel" id="log-panel">
+<h3>EVENT LOG</h3>
+</div>
+
+</div>
+
+<canvas id="processor" width="640" height="640" style="display:none;"></canvas>
+
+<script src="app.js"></script>
 
 </body>
 </html>
