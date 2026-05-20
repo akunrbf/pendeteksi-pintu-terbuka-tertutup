@@ -50,7 +50,9 @@ Semua proses berjalan secara **client-side**, sehingga data tidak dikirim ke ser
 
 door-detection-ai/
 │
+
 ├── index.html      # Tampilan aplikasi
+
 ├── app.js          # Engine AI & inference
 ├── style.css       # UI Styling
 ├── best.onnx       # Model AI
