@@ -62,6 +62,7 @@ door-detection-ai/
 
 └── README.md
 
+---
 
 ## 📊 Dataset & Training Model
 
