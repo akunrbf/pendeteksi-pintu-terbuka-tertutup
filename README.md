@@ -65,20 +65,40 @@ door-detection-ai/
 
 ## 📊 Dataset & Training Model
 
-Model dilatih menggunakan dataset pintu dengan variasi:
+Model ini dilatih menggunakan dataset pintu dengan variasi kondisi nyata untuk meningkatkan akurasi deteksi di berbagai situasi.
 
-Sudut kamera berbeda
-Kondisi pencahayaan berbeda
-Posisi pintu terbuka sebagian
-Lingkungan indoor berbeda
+### 📁 Dataset
+Dataset mencakup berbagai kondisi:
 
-Tahapan training:
+- Sudut kamera yang berbeda
+- Kondisi pencahayaan (terang, redup, gelap)
+- Pintu terbuka sebagian dan penuh
+- Lingkungan indoor yang beragam
 
-Upload dataset ke Roboflow
-Label objek pintu
-Training model object detection
-Export model format ONNX
-Integrasi ke aplikasi web
+🔗 Dataset Source (Roboflow):  
+https://roboflow.com (ganti dengan link dataset kamu)
+
+---
+
+### ⚙️ Tahapan Training
+
+Proses training model dilakukan melalui beberapa tahap:
+
+1. Pengumpulan dan upload dataset ke Roboflow
+2. Labeling objek pintu (Open / Closed)
+3. Training model Object Detection (YOLO)
+4. Evaluasi performa model
+5. Export model ke format **ONNX**
+6. Integrasi ke aplikasi web berbasis JavaScript
+
+---
+
+### 🧠 Training Pipeline
+
+Model dilatih menggunakan workflow berbasis cloud untuk mempercepat eksperimen dan memudahkan proses iterasi.
+
+🔗 Training Notebook (Google Colab):  
+https://colab.research.google.com (ganti kalau kamu punya link sendiri)
 
 ---
 
@@ -108,7 +128,7 @@ Edge AI Surveillance
 
 ## 👨‍💻 Author
 
-Dibuat oleh Nama Kamu
+Dibuat oleh Muhamad Fadlan & Edwin Prayoga
 
 AI & Software Developer
 
