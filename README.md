@@ -1,62 +1,53 @@
-🚪 Smart Door State Detection AI
+# 🚪 Smart Door State Detection (Edge AI)
 
-Sistem Computer Vision berbasis Edge AI untuk mendeteksi kondisi pintu Terbuka atau Tertutup secara realtime menggunakan kamera perangkat langsung dari browser.
+Sistem Computer Vision berbasis Edge AI untuk mendeteksi kondisi pintu secara realtime langsung di browser tanpa backend.
 
-Seluruh proses Artificial Intelligence berjalan sepenuhnya di sisi client (browser) menggunakan ONNX Runtime Web, tanpa server backend maupun pengiriman data ke cloud.
+Model AI berjalan menggunakan ONNX Runtime Web, sehingga seluruh proses inference dilakukan secara lokal di perangkat pengguna.
 
-🎯 Deskripsi Project
+---
 
-Project ini merupakan simulasi sistem monitoring pintu otomatis yang dapat digunakan pada lingkungan keamanan modern seperti:
+## 🎯 Tujuan Project
 
-Smart Building
-Monitoring Ruangan Terbatas
-Sistem Keamanan Sekolah / Kantor
-Smart Home Automation
-IoT Vision System
+Project ini dibuat sebagai simulasi sistem monitoring pintu otomatis yang dapat digunakan pada:
 
-Pendekatan edge-native inference memastikan:
+- Sistem keamanan ruangan
+- Smart building monitoring
+- Laboratorium atau ruang terbatas
+- Sistem berbasis kamera (Computer Vision)
 
-✅ Latensi sangat rendah
-✅ Privasi data kamera terjaga
-✅ Tidak membutuhkan server tambahan
+Semua proses berjalan secara **client-side**, sehingga data tidak dikirim ke server.
 
-⚡ Fitur Utama
-🚪 Deteksi kondisi pintu realtime
-📷 Menggunakan webcam langsung
-🧠 AI inference di browser
-⚡ Zero backend system
-🔒 Pemrosesan lokal (privacy-safe)
-🎯 Bounding box otomatis
-💻 Ringan & cepat dijalankan
-🧠 Kelas Deteksi
+---
 
-Model AI mengenali dua kondisi:
+## ⚡ Fitur Utama
 
-🚪 Door Open — Pintu Terbuka
-🔒 Door Closed — Pintu Tertutup
-🏗️ Arsitektur Sistem
+- 🚪 Deteksi pintu realtime via webcam
+- 🧠 AI inference langsung di browser (Edge AI)
+- ⚡ Tanpa backend / server
+- 🔒 Privasi data (proses lokal)
+- 📦 Model ringan format ONNX
 
-Alur kerja aplikasi:
+---
 
-Kamera menangkap video realtime
-Frame dikirim ke canvas pemrosesan
-Pixel diubah menjadi tensor AI
-Model ONNX melakukan inference
-Hasil deteksi divisualisasikan pada overlay canvas
+## 🧠 Kelas Deteksi
 
-Seluruh proses berjalan langsung pada browser menggunakan WebAssembly.
+- 🚪 Pintu Terbuka
+- 🔒 Pintu Tertutup
 
-🛠️ Teknologi Yang Digunakan
-HTML5
-CSS3
-JavaScript
-ONNX Runtime Web
-WebAssembly (WASM)
-Roboflow Dataset
-WebCam API
-Computer Vision
+---
 
-📂 Struktur Project
+## 🧩 Cara Kerja Sistem
+
+1. Webcam menangkap video realtime
+2. Frame diproses menggunakan canvas
+3. Data dikonversi menjadi tensor
+4. Model ONNX melakukan inference
+5. Hasil deteksi ditampilkan sebagai bounding box
+
+---
+
+## 📂 Struktur Project
+
 door-detection-ai/
 │
 ├── index.html      # Tampilan aplikasi
