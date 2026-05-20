@@ -49,15 +49,21 @@ Semua proses berjalan secara **client-side**, sehingga data tidak dikirim ke ser
 ## 📂 Struktur Project
 
 door-detection-ai/
+
 │
 
 ├── index.html      # Tampilan aplikasi
 
 ├── app.js          # Engine AI & inference
+
 ├── style.css       # UI Styling
+
 ├── best.onnx       # Model AI
+
 └── README.md
-📊 Dataset & Training Model
+
+
+## 📊 Dataset & Training Model
 
 Model dilatih menggunakan dataset pintu dengan variasi:
 
@@ -74,7 +80,9 @@ Training model object detection
 Export model format ONNX
 Integrasi ke aplikasi web
 
-🚀 Deployment (GitHub Pages)
+---
+
+## 🚀 Deployment (GitHub Pages)
 
 Project ini hanya menggunakan file statis sehingga dapat di-hosting gratis.
 
@@ -85,7 +93,10 @@ Pastikan file best.onnx berada di root project
 Buka Repository Settings → Pages
 Deploy dari branch main
 Aplikasi siap digunakan melalui URL GitHub Pages
-💡 Pengembangan Selanjutnya
+
+---
+
+## 💡 Pengembangan Selanjutnya
 
 Project ini dapat dikembangkan menjadi:
 
@@ -95,7 +106,7 @@ Integrasi IoT Smart Home
 Sistem Alarm Otomatis
 Edge AI Surveillance
 
-👨‍💻 Author
+## 👨‍💻 Author
 
 Dibuat oleh Nama Kamu
 
@@ -103,6 +114,6 @@ AI & Software Developer
 
 Built with ☕, eksperimen AI, dan rasa penasaran tinggi.
 
-⭐ Support
+## ⭐ Support
 
 Jika project ini membantu atau menginspirasi, jangan lupa beri ⭐ pada repository ini.
