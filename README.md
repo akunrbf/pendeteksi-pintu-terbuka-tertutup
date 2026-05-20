@@ -78,7 +78,6 @@ Dataset mencakup berbagai kondisi:
 🔗 Dataset Source (Roboflow):  
 https://roboflow.com (ganti dengan link dataset kamu)
 
----
 
 ### ⚙️ Tahapan Training
 
@@ -91,7 +90,6 @@ Proses training model dilakukan melalui beberapa tahap:
 5. Export model ke format **ONNX**
 6. Integrasi ke aplikasi web berbasis JavaScript
 
----
 
 ### 🧠 Training Pipeline
 
