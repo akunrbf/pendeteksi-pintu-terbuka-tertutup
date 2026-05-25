@@ -1,250 +1,377 @@
 // ================= ELEMENT =================
-const video=document.getElementById('webcam');
-const overlay=document.getElementById('overlay');
-const ctxOverlay=overlay.getContext('2d');
+const video = document.getElementById('webcam');
+const overlay = document.getElementById('overlay');
+const ctxOverlay = overlay.getContext('2d');
 
-const processor=document.getElementById('processor');
-const ctxProcessor=processor.getContext('2d',{willReadFrequently:true});
+const processor = document.getElementById('processor');
+const ctxProcessor = processor.getContext('2d', {
+    willReadFrequently: true
+});
 
-const statusPanel=document.getElementById('status-panel');
-const logPanel=document.getElementById('log-panel');
-const initBtn=document.getElementById('btn-init');
+const statusPanel = document.getElementById('status-panel');
+const logPanel = document.getElementById('log-panel');
+const initBtn = document.getElementById('btn-init');
 
 // ================= AUDIO =================
-const alarmSound=new Audio(
+const alarmSound = new Audio(
 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
 );
 
-const successSound=new Audio(
+const successSound = new Audio(
 'https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'
 );
 
-let currentState="AWAITING";
-let session=null;
+// ================= CONFIG =================
+const CONFIG = {
+    modelPath: './best.onnx',
 
-// ================= MODEL CONFIG =================
-const TARGET_SIZE=640;
-const CONFIDENCE_THRESHOLD=0.5;
-const IOU_THRESHOLD=0.4;
+    labels: [
+        'closed',
+        'open'
+    ],
+
+    inputSize: 640,
+
+    confidence: 0.70,
+    iouThreshold: 0.45,
+
+    maxDetections: 10
+};
+
+// ================= GLOBAL =================
+let session = null;
+let currentState = "NONE";
+let lastDetectionTime = 0;
 
 // ================= INIT =================
-initBtn.addEventListener('click',async()=>{
+initBtn.addEventListener('click', async () => {
 
-initBtn.disabled=true;
-initBtn.innerText="BOOTING...";
+    initBtn.disabled = true;
+    initBtn.innerText = "BOOTING...";
 
-if(Notification.permission!=="granted")
-await Notification.requestPermission();
+    try {
 
-await loadModel();
+        if (Notification.permission !== "granted") {
+            await Notification.requestPermission();
+        }
+
+        await loadModel();
+        await startCamera();
+
+        statusPanel.innerText = "✅ SYSTEM ACTIVE";
+
+    } catch (err) {
+
+        console.error(err);
+
+        statusPanel.innerText = "❌ ERROR LOAD MODEL";
+    }
 });
 
 // ================= LOAD MODEL =================
-async function loadModel(){
+async function loadModel() {
 
-ort.env.wasm.wasmPaths=
-'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+    ort.env.wasm.wasmPaths =
+        'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
-session=await ort.InferenceSession.create(
-'./best.onnx',
-{
-executionProviders:['webgl','wasm'],
-graphOptimizationLevel:'all'
-});
+    session = await ort.InferenceSession.create(
+        CONFIG.modelPath,
+        {
+            executionProviders: ['webgl', 'wasm'],
+            graphOptimizationLevel: 'all'
+        }
+    );
 
-statusPanel.innerText="MODEL READY";
-startCamera();
+    console.log("MODEL LOADED");
 }
 
 // ================= CAMERA =================
-async function startCamera(){
+async function startCamera() {
 
-const stream=await navigator.mediaDevices.getUserMedia({
-video:{width:640,height:480}
-});
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+            width: 640,
+            height: 480,
+            facingMode: 'environment'
+        },
+        audio: false
+    });
 
-video.srcObject=stream;
+    video.srcObject = stream;
 
-video.onloadedmetadata=()=>{
-video.play();
-requestAnimationFrame(processFrame);
-};
+    await video.play();
+
+    requestAnimationFrame(detectFrame);
 }
 
 // ================= IOU =================
-function calculateIoU(a,b){
+function iou(box1, box2) {
 
-const xA=Math.max(a.x,b.x);
-const yA=Math.max(a.y,b.y);
-const xB=Math.min(a.x+a.w,b.x+b.w);
-const yB=Math.min(a.y+a.h,b.y+b.h);
+    const x1 = Math.max(box1.x, box2.x);
+    const y1 = Math.max(box1.y, box2.y);
 
-const inter=Math.max(0,xB-xA)*Math.max(0,yB-yA);
+    const x2 = Math.min(
+        box1.x + box1.width,
+        box2.x + box2.width
+    );
 
-return inter/(a.w*a.h+b.w*b.h-inter);
+    const y2 = Math.min(
+        box1.y + box1.height,
+        box2.y + box2.height
+    );
+
+    const intersection =
+        Math.max(0, x2 - x1) *
+        Math.max(0, y2 - y1);
+
+    const union =
+        (box1.width * box1.height) +
+        (box2.width * box2.height) -
+        intersection;
+
+    return intersection / union;
 }
 
 // ================= NMS =================
-function nonMaxSuppression(boxes){
+function nonMaxSuppression(boxes) {
 
-boxes.sort((a,b)=>b.score-a.score);
+    boxes.sort((a, b) => b.score - a.score);
 
-const result=[];
+    const selected = [];
 
-while(boxes.length){
-const best=boxes.shift();
-result.push(best);
+    while (boxes.length > 0) {
 
-boxes=boxes.filter(
-b=>calculateIoU(best,b)<IOU_THRESHOLD
-);
+        const first = boxes.shift();
+
+        selected.push(first);
+
+        boxes = boxes.filter(box => {
+
+            return iou(first, box) < CONFIG.iouThreshold;
+
+        });
+    }
+
+    return selected.slice(0, CONFIG.maxDetections);
 }
 
-return result;
+// ================= PREPROCESS =================
+function prepareInput() {
+
+    ctxProcessor.drawImage(
+        video,
+        0,
+        0,
+        CONFIG.inputSize,
+        CONFIG.inputSize
+    );
+
+    const imageData = ctxProcessor.getImageData(
+        0,
+        0,
+        CONFIG.inputSize,
+        CONFIG.inputSize
+    );
+
+    const { data } = imageData;
+
+    const input = new Float32Array(
+        3 * CONFIG.inputSize * CONFIG.inputSize
+    );
+
+    for (let i = 0; i < CONFIG.inputSize * CONFIG.inputSize; i++) {
+
+        input[i] = data[i * 4] / 255.0;
+
+        input[i + CONFIG.inputSize * CONFIG.inputSize] =
+            data[i * 4 + 1] / 255.0;
+
+        input[i + CONFIG.inputSize * CONFIG.inputSize * 2] =
+            data[i * 4 + 2] / 255.0;
+    }
+
+    return input;
 }
 
-// ================= LOG =================
-function logDoorEvent(){
+// ================= LOG EVENT =================
+function saveLog() {
 
-const c=document.createElement('canvas');
-c.width=video.videoWidth;
-c.height=video.videoHeight;
+    const c = document.createElement('canvas');
 
-c.getContext('2d').drawImage(video,0,0);
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
 
-const img=c.toDataURL('image/jpeg');
+    c.getContext('2d').drawImage(video, 0, 0);
 
-const div=document.createElement('div');
-div.className='log-entry';
+    const img = c.toDataURL('image/jpeg');
 
-div.innerHTML=`
-<img src="${img}">
-<p>🚪 PINTU TERBUKA<br>
-${new Date().toLocaleTimeString()}
-</p>`;
+    const div = document.createElement('div');
 
-logPanel.prepend(div);
+    div.className = 'log-entry';
 
-if(Notification.permission==="granted"){
-new Notification("Pintu Terbuka!",{icon:img});
-}
-}
+    div.innerHTML = `
+        <img src="${img}">
+        <p>
+        🚪 PINTU TERBUKA<br>
+        ${new Date().toLocaleTimeString()}
+        </p>
+    `;
 
-// ================= MAIN LOOP =================
-async function processFrame(){
+    logPanel.prepend(div);
 
-if(!session)return;
+    if (Notification.permission === "granted") {
 
-// resize
-ctxProcessor.drawImage(video,0,0,TARGET_SIZE,TARGET_SIZE);
-
-const data=
-ctxProcessor.getImageData(0,0,TARGET_SIZE,TARGET_SIZE).data;
-
-// tensor
-const input=new Float32Array(3*TARGET_SIZE*TARGET_SIZE);
-
-for(let i=0;i<TARGET_SIZE*TARGET_SIZE;i++){
-
-input[i]=data[i*4]/255;
-input[i+TARGET_SIZE*TARGET_SIZE]=data[i*4+1]/255;
-input[i+2*TARGET_SIZE*TARGET_SIZE]=data[i*4+2]/255;
+        new Notification("DoorGuard Alert", {
+            body: "Pintu terbuka terdeteksi",
+            icon: img
+        });
+    }
 }
 
-const tensor=new ort.Tensor(
-'float32',
-input,
-[1,3,TARGET_SIZE,TARGET_SIZE]
-);
+// ================= DRAW =================
+function drawBoxes(boxes) {
 
-const output=
-(await session.run({
-[session.inputNames[0]]:tensor
-}))[session.outputNames[0]].data;
+    ctxOverlay.clearRect(0, 0, 640, 480);
 
-const ELEMENTS=8400;
-let boxes=[];
+    let foundOpen = false;
 
-// ===== PARSE YOLO =====
-for(let i=0;i<ELEMENTS;i++){
+    boxes.forEach(box => {
 
-let x=output[i];
-let y=output[i+ELEMENTS];
-let w=output[i+2*ELEMENTS];
-let h=output[i+3*ELEMENTS];
+        const x = box.x * (640 / CONFIG.inputSize);
+        const y = box.y * (480 / CONFIG.inputSize);
 
-const closed=output[i+4*ELEMENTS];
-const open=output[i+5*ELEMENTS];
+        const w = box.width * (640 / CONFIG.inputSize);
+        const h = box.height * (480 / CONFIG.inputSize);
 
-const score=Math.max(closed,open);
-if(score<CONFIDENCE_THRESHOLD)continue;
+        const color =
+            box.classId === 1
+            ? '#ff3b30'
+            : '#00ff88';
 
-x*=TARGET_SIZE;
-y*=TARGET_SIZE;
-w*=TARGET_SIZE;
-h*=TARGET_SIZE;
+        if (box.classId === 1) {
+            foundOpen = true;
+        }
 
-boxes.push({
-x:x-w/2,
-y:y-h/2,
-w,
-h,
-score,
-classId:open>closed?1:0
-});
+        ctxOverlay.strokeStyle = color;
+        ctxOverlay.lineWidth = 4;
+
+        ctxOverlay.strokeRect(x, y, w, h);
+
+        ctxOverlay.fillStyle = color;
+        ctxOverlay.font = 'bold 18px Arial';
+
+        ctxOverlay.fillText(
+            `${CONFIG.labels[box.classId]} ${(box.score * 100).toFixed(0)}%`,
+            x,
+            y - 10
+        );
+    });
+
+    // ===== STATUS =====
+
+    if (foundOpen) {
+
+        statusPanel.innerText =
+            "🚨 WARNING : PINTU TERBUKA";
+
+        if (currentState !== "OPEN") {
+
+            alarmSound.currentTime = 0;
+            alarmSound.play();
+
+            saveLog();
+
+            currentState = "OPEN";
+        }
+
+    } else {
+
+        statusPanel.innerText =
+            "🔒 PINTU TERTUTUP";
+
+        if (currentState !== "CLOSED") {
+
+            successSound.currentTime = 0;
+            successSound.play();
+
+            currentState = "CLOSED";
+        }
+    }
 }
 
-boxes=nonMaxSuppression(boxes);
+// ================= DETECT =================
+async function detectFrame() {
 
-ctxOverlay.clearRect(0,0,640,480);
+    if (!session) {
 
-let isDoorOpen=false;
+        requestAnimationFrame(detectFrame);
+        return;
+    }
 
-boxes.forEach(box=>{
+    try {
 
-const sx=box.x*(640/TARGET_SIZE);
-const sy=box.y*(480/TARGET_SIZE);
-const sw=box.w*(640/TARGET_SIZE);
-const sh=box.h*(480/TARGET_SIZE);
+        const input = prepareInput();
 
-if(box.classId===1)isDoorOpen=true;
+        const tensor = new ort.Tensor(
+            'float32',
+            input,
+            [1, 3, CONFIG.inputSize, CONFIG.inputSize]
+        );
 
-ctxOverlay.strokeStyle=
-box.classId?'#FF3B30':'#34C759';
+        const outputs = await session.run({
+            [session.inputNames[0]]: tensor
+        });
 
-ctxOverlay.lineWidth=4;
-ctxOverlay.strokeRect(sx,sy,sw,sh);
+        const output =
+            outputs[session.outputNames[0]].data;
 
-ctxOverlay.fillStyle=
-box.classId?'#FF3B30':'#34C759';
+        const boxes = [];
 
-ctxOverlay.fillText(
-box.classId?'OPEN':'CLOSED',
-sx,
-sy-5
-);
-});
+        const rows = 8400;
+        const dimensions = 6;
 
-// ===== STATUS =====
-if(isDoorOpen){
+        for (let i = 0; i < rows; i++) {
 
-statusPanel.innerText="🚪 WARNING: PINTU TERBUKA";
+            const offset = i * dimensions;
 
-if(currentState!=="OPEN"){
-alarmSound.play();
-logDoorEvent();
-currentState="OPEN";
-}
+            const x = output[offset];
+            const y = output[offset + 1];
+            const w = output[offset + 2];
+            const h = output[offset + 3];
 
-}else{
+            const scoreClosed = output[offset + 4];
+            const scoreOpen = output[offset + 5];
 
-statusPanel.innerText="🔒 PINTU TERTUTUP";
+            const score =
+                Math.max(scoreClosed, scoreOpen);
 
-if(currentState!=="CLOSED"){
-successSound.play();
-currentState="CLOSED";
-}
-}
+            if (score < CONFIG.confidence) continue;
 
-requestAnimationFrame(processFrame);
+            const classId =
+                scoreOpen > scoreClosed ? 1 : 0;
+
+            boxes.push({
+
+                x: x - w / 2,
+                y: y - h / 2,
+
+                width: w,
+                height: h,
+
+                score,
+                classId
+            });
+        }
+
+        const finalBoxes =
+            nonMaxSuppression(boxes);
+
+        drawBoxes(finalBoxes);
+
+    } catch (err) {
+
+        console.error(err);
+    }
+
+    requestAnimationFrame(detectFrame);
 }
