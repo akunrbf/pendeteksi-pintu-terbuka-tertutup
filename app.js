@@ -42,7 +42,7 @@ async function loadModel() {
             'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
         session = await ort.InferenceSession.create('./best.onnx', {
-            executionProviders: ['webgl', 'wasm']
+            executionProviders: ['wasm']
         });
 
         statusPanel.innerText = "MODEL LOADED - STARTING CAMERA";
