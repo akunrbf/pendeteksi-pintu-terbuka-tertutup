@@ -4,22 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Smart Door State Detection</title>
+<title>Smart Door Detection AI</title>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 
 <style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
 body{
+    margin:0;
+    font-family:Arial;
     background:#0f172a;
     color:white;
-    font-family:Arial, Helvetica, sans-serif;
-    min-height:100vh;
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -27,26 +21,18 @@ body{
 }
 
 h1{
-    font-size:40px;
     margin-bottom:5px;
 }
 
-.sub{
-    color:#94a3b8;
-    margin-bottom:20px;
-}
-
 button{
-    padding:14px 30px;
-    border:none;
-    border-radius:12px;
-    background:#2563eb;
-    color:white;
+    padding:12px 25px;
     font-size:18px;
-    font-weight:bold;
+    background:#2563eb;
+    border:none;
+    color:white;
+    border-radius:10px;
     cursor:pointer;
-    transition:0.3s;
-    margin-bottom:20px;
+    margin:15px 0;
 }
 
 button:hover{
@@ -54,16 +40,16 @@ button:hover{
 }
 
 .status{
-    width:100%;
-    max-width:900px;
-    padding:20px;
-    border-radius:16px;
-    font-size:28px;
-    font-weight:bold;
+    width:90%;
+    max-width:800px;
+    padding:15px;
     text-align:center;
-    margin-bottom:20px;
-    border:3px solid #334155;
+    font-size:22px;
+    font-weight:bold;
     background:#1e293b;
+    border-radius:12px;
+    margin-bottom:20px;
+    border:2px solid #334155;
 }
 
 .container{
@@ -73,16 +59,16 @@ button:hover{
     justify-content:center;
 }
 
-.camera-box{
+.camera{
     position:relative;
-    width:900px;
-    max-width:100%;
+    width:640px;
+    height:480px;
 }
 
-video,
-canvas{
+video,canvas{
     width:100%;
-    border-radius:20px;
+    height:100%;
+    border-radius:12px;
 }
 
 #overlay{
@@ -91,28 +77,21 @@ canvas{
     top:0;
 }
 
-.log-box{
-    width:320px;
-    height:675px;
+.log{
+    width:300px;
+    height:480px;
     overflow:auto;
     background:#111827;
-    border-radius:20px;
-    padding:15px;
-    border:2px solid #334155;
-}
-
-.log-title{
-    text-align:center;
-    margin-bottom:15px;
-    font-size:22px;
+    border-radius:12px;
+    padding:10px;
+    border:1px solid #334155;
 }
 
 .log-item{
     background:#1e293b;
-    border-radius:14px;
+    margin-bottom:10px;
+    border-radius:10px;
     overflow:hidden;
-    margin-bottom:15px;
-    border:2px solid #334155;
 }
 
 .log-item img{
@@ -120,51 +99,35 @@ canvas{
 }
 
 .log-item p{
-    padding:10px;
+    font-size:12px;
     text-align:center;
-    font-size:14px;
-}
-
-.footer{
-    margin-top:25px;
-    color:#94a3b8;
-}
-
-.footer span{
-    color:#60a5fa;
-    font-weight:bold;
+    padding:5px;
 }
 </style>
 </head>
+
 <body>
 
-<h1>🚪 Smart Door State Detection</h1>
-<p class="sub">Edge AI Door Monitoring System</p>
+<h1>🚪 Smart Door Detection AI</h1>
 
-<button id="btn-init">START SYSTEM</button>
+<button id="btn">START SYSTEM</button>
 
-<div class="status" id="status-panel">
-    SYSTEM OFFLINE
-</div>
+<div class="status" id="status">SYSTEM OFF</div>
 
 <div class="container">
 
-    <div class="camera-box">
-        <video id="webcam" autoplay playsinline muted></video>
+    <div class="camera">
+        <video id="webcam" autoplay muted playsinline></video>
         <canvas id="overlay" width="640" height="480"></canvas>
     </div>
 
-    <div class="log-box" id="log-panel">
-        <h2 class="log-title">📋 Door Activity Log</h2>
+    <div class="log" id="log">
+        <b style="display:block;text-align:center;margin-bottom:10px;">LOG</b>
     </div>
 
 </div>
 
 <canvas id="processor" width="640" height="640" style="display:none;"></canvas>
-
-<div class="footer">
-    Built by <span>Ramadhirra Azzahra Putri</span>
-</div>
 
 <script src="app.js"></script>
 
