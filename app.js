@@ -1,377 +1,271 @@
-// ================= ELEMENT =================
 const video = document.getElementById('webcam');
 const overlay = document.getElementById('overlay');
 const ctxOverlay = overlay.getContext('2d');
 
 const processor = document.getElementById('processor');
-const ctxProcessor = processor.getContext('2d', {
-    willReadFrequently: true
-});
+const ctxProcessor = processor.getContext('2d', { willReadFrequently: true });
 
 const statusPanel = document.getElementById('status-panel');
 const logPanel = document.getElementById('log-panel');
 const initBtn = document.getElementById('btn-init');
 
-// ================= AUDIO =================
-const alarmSound = new Audio(
-'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
-);
-
-const successSound = new Audio(
-'https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'
-);
-
 // ================= CONFIG =================
-const CONFIG = {
-    modelPath: './best.onnx',
+const TARGET_SIZE = 640;
+const CONFIDENCE_THRESHOLD = 0.4;
+const IOU_THRESHOLD = 0.4;
 
-    labels: [
-        'closed',
-        'open'
-    ],
-
-    inputSize: 640,
-
-    confidence: 0.70,
-    iouThreshold: 0.45,
-
-    maxDetections: 10
+// 🔥 CLASS MAPPING (AMAN WALAU ONNX KEBALIK)
+const CLASS_MAP = {
+    0: "OPEN",
+    1: "CLOSED"
 };
 
-// ================= GLOBAL =================
-let session = null;
-let currentState = "NONE";
-let lastDetectionTime = 0;
+// ================= STATE =================
+let session;
+let currentState = "WAITING";
 
-// ================= INIT =================
+// ================= SOUND =================
+const alarmSound = new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
+
+// ================= INIT BUTTON =================
 initBtn.addEventListener('click', async () => {
-
     initBtn.disabled = true;
-    initBtn.innerText = "BOOTING...";
+    initBtn.innerText = "LOADING SYSTEM...";
 
-    try {
-
-        if (Notification.permission !== "granted") {
-            await Notification.requestPermission();
-        }
-
-        await loadModel();
-        await startCamera();
-
-        statusPanel.innerText = "✅ SYSTEM ACTIVE";
-
-    } catch (err) {
-
-        console.error(err);
-
-        statusPanel.innerText = "❌ ERROR LOAD MODEL";
-    }
+    await loadModel();
 });
 
 // ================= LOAD MODEL =================
 async function loadModel() {
+    try {
+        ort.env.wasm.wasmPaths =
+            'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
 
-    ort.env.wasm.wasmPaths =
-        'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+        session = await ort.InferenceSession.create('./best.onnx', {
+            executionProviders: ['webgl', 'wasm']
+        });
 
-    session = await ort.InferenceSession.create(
-        CONFIG.modelPath,
-        {
-            executionProviders: ['webgl', 'wasm'],
-            graphOptimizationLevel: 'all'
-        }
-    );
+        statusPanel.innerText = "MODEL LOADED - STARTING CAMERA";
 
-    console.log("MODEL LOADED");
+        startCamera();
+
+    } catch (err) {
+        console.error(err);
+        statusPanel.innerText = "MODEL LOAD FAILED";
+    }
 }
 
 // ================= CAMERA =================
 async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+        });
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-            width: 640,
-            height: 480,
-            facingMode: 'environment'
-        },
-        audio: false
-    });
+        video.srcObject = stream;
 
-    video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+            initBtn.style.display = "none";
+            requestAnimationFrame(processFrame);
+        };
 
-    await video.play();
+    } catch (err) {
+        console.error(err);
+        statusPanel.innerText = "CAMERA ERROR";
+    }
+}
 
-    requestAnimationFrame(detectFrame);
+// ================= LOG =================
+function addLog(img, text) {
+    const item = document.createElement('div');
+    item.className = 'log-item';
+
+    item.innerHTML = `
+        <img src="${img}">
+        <p>${text}</p>
+    `;
+
+    logPanel.prepend(item);
+}
+
+function captureFrame(label) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    const img = canvas.toDataURL('image/jpeg');
+
+    addLog(img, label);
 }
 
 // ================= IOU =================
-function iou(box1, box2) {
+function calculateIoU(a, b) {
+    const x1 = Math.max(a.x, b.x);
+    const y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.w, b.x + b.w);
+    const y2 = Math.min(a.y + a.h, b.y + b.h);
 
-    const x1 = Math.max(box1.x, box2.x);
-    const y1 = Math.max(box1.y, box2.y);
+    const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
 
-    const x2 = Math.min(
-        box1.x + box1.width,
-        box2.x + box2.width
-    );
-
-    const y2 = Math.min(
-        box1.y + box1.height,
-        box2.y + box2.height
-    );
-
-    const intersection =
-        Math.max(0, x2 - x1) *
-        Math.max(0, y2 - y1);
-
-    const union =
-        (box1.width * box1.height) +
-        (box2.width * box2.height) -
-        intersection;
-
-    return intersection / union;
+    return inter / ((a.w * a.h) + (b.w * b.h) - inter);
 }
 
-// ================= NMS =================
-function nonMaxSuppression(boxes) {
-
+function nms(boxes, threshold) {
     boxes.sort((a, b) => b.score - a.score);
 
-    const selected = [];
+    const result = [];
 
-    while (boxes.length > 0) {
+    while (boxes.length) {
+        const best = boxes.shift();
+        result.push(best);
 
-        const first = boxes.shift();
-
-        selected.push(first);
-
-        boxes = boxes.filter(box => {
-
-            return iou(first, box) < CONFIG.iouThreshold;
-
-        });
+        boxes = boxes.filter(b => calculateIoU(best, b) < threshold);
     }
 
-    return selected.slice(0, CONFIG.maxDetections);
+    return result;
 }
 
-// ================= PREPROCESS =================
-function prepareInput() {
+// ================= MAIN LOOP =================
+async function processFrame() {
+    if (!session) return;
 
-    ctxProcessor.drawImage(
-        video,
-        0,
-        0,
-        CONFIG.inputSize,
-        CONFIG.inputSize
-    );
+    ctxProcessor.drawImage(video, 0, 0, TARGET_SIZE, TARGET_SIZE);
 
     const imageData = ctxProcessor.getImageData(
-        0,
-        0,
-        CONFIG.inputSize,
-        CONFIG.inputSize
-    );
+        0, 0, TARGET_SIZE, TARGET_SIZE
+    ).data;
 
-    const { data } = imageData;
+    const input = new Float32Array(3 * TARGET_SIZE * TARGET_SIZE);
 
-    const input = new Float32Array(
-        3 * CONFIG.inputSize * CONFIG.inputSize
-    );
-
-    for (let i = 0; i < CONFIG.inputSize * CONFIG.inputSize; i++) {
-
-        input[i] = data[i * 4] / 255.0;
-
-        input[i + CONFIG.inputSize * CONFIG.inputSize] =
-            data[i * 4 + 1] / 255.0;
-
-        input[i + CONFIG.inputSize * CONFIG.inputSize * 2] =
-            data[i * 4 + 2] / 255.0;
+    for (let i = 0; i < TARGET_SIZE * TARGET_SIZE; i++) {
+        input[i] = imageData[i * 4] / 255;
+        input[i + TARGET_SIZE * TARGET_SIZE] = imageData[i * 4 + 1] / 255;
+        input[i + 2 * TARGET_SIZE * TARGET_SIZE] = imageData[i * 4 + 2] / 255;
     }
 
-    return input;
-}
+    const tensor = new ort.Tensor('float32', input, [
+        1, 3, TARGET_SIZE, TARGET_SIZE
+    ]);
 
-// ================= LOG EVENT =================
-function saveLog() {
-
-    const c = document.createElement('canvas');
-
-    c.width = video.videoWidth;
-    c.height = video.videoHeight;
-
-    c.getContext('2d').drawImage(video, 0, 0);
-
-    const img = c.toDataURL('image/jpeg');
-
-    const div = document.createElement('div');
-
-    div.className = 'log-entry';
-
-    div.innerHTML = `
-        <img src="${img}">
-        <p>
-        🚪 PINTU TERBUKA<br>
-        ${new Date().toLocaleTimeString()}
-        </p>
-    `;
-
-    logPanel.prepend(div);
-
-    if (Notification.permission === "granted") {
-
-        new Notification("DoorGuard Alert", {
-            body: "Pintu terbuka terdeteksi",
-            icon: img
-        });
-    }
-}
-
-// ================= DRAW =================
-function drawBoxes(boxes) {
-
-    ctxOverlay.clearRect(0, 0, 640, 480);
-
-    let foundOpen = false;
-
-    boxes.forEach(box => {
-
-        const x = box.x * (640 / CONFIG.inputSize);
-        const y = box.y * (480 / CONFIG.inputSize);
-
-        const w = box.width * (640 / CONFIG.inputSize);
-        const h = box.height * (480 / CONFIG.inputSize);
-
-        const color =
-            box.classId === 1
-            ? '#ff3b30'
-            : '#00ff88';
-
-        if (box.classId === 1) {
-            foundOpen = true;
-        }
-
-        ctxOverlay.strokeStyle = color;
-        ctxOverlay.lineWidth = 4;
-
-        ctxOverlay.strokeRect(x, y, w, h);
-
-        ctxOverlay.fillStyle = color;
-        ctxOverlay.font = 'bold 18px Arial';
-
-        ctxOverlay.fillText(
-            `${CONFIG.labels[box.classId]} ${(box.score * 100).toFixed(0)}%`,
-            x,
-            y - 10
-        );
+    const results = await session.run({
+        [session.inputNames[0]]: tensor
     });
 
-    // ===== STATUS =====
+    const output = results[session.outputNames[0]].data;
 
-    if (foundOpen) {
+    const elements = 8400;
+    let boxes = [];
 
-        statusPanel.innerText =
-            "🚨 WARNING : PINTU TERBUKA";
+    for (let i = 0; i < elements; i++) {
 
-        if (currentState !== "OPEN") {
+        let x = output[i];
+        let y = output[i + elements];
+        let w = output[i + elements * 2];
+        let h = output[i + elements * 3];
 
-            alarmSound.currentTime = 0;
-            alarmSound.play();
+        const openScore = output[i + elements * 4];
+        const closedScore = output[i + elements * 5];
 
-            saveLog();
+        const score = Math.max(openScore, closedScore);
 
-            currentState = "OPEN";
-        }
+        if (score > CONFIDENCE_THRESHOLD) {
 
-    } else {
+            if (w <= 1.5 && h <= 1.5) {
+                x *= TARGET_SIZE;
+                y *= TARGET_SIZE;
+                w *= TARGET_SIZE;
+                h *= TARGET_SIZE;
+            }
 
-        statusPanel.innerText =
-            "🔒 PINTU TERTUTUP";
-
-        if (currentState !== "CLOSED") {
-
-            successSound.currentTime = 0;
-            successSound.play();
-
-            currentState = "CLOSED";
-        }
-    }
-}
-
-// ================= DETECT =================
-async function detectFrame() {
-
-    if (!session) {
-
-        requestAnimationFrame(detectFrame);
-        return;
-    }
-
-    try {
-
-        const input = prepareInput();
-
-        const tensor = new ort.Tensor(
-            'float32',
-            input,
-            [1, 3, CONFIG.inputSize, CONFIG.inputSize]
-        );
-
-        const outputs = await session.run({
-            [session.inputNames[0]]: tensor
-        });
-
-        const output =
-            outputs[session.outputNames[0]].data;
-
-        const boxes = [];
-
-        const rows = 8400;
-        const dimensions = 6;
-
-        for (let i = 0; i < rows; i++) {
-
-            const offset = i * dimensions;
-
-            const x = output[offset];
-            const y = output[offset + 1];
-            const w = output[offset + 2];
-            const h = output[offset + 3];
-
-            const scoreClosed = output[offset + 4];
-            const scoreOpen = output[offset + 5];
-
-            const score =
-                Math.max(scoreClosed, scoreOpen);
-
-            if (score < CONFIG.confidence) continue;
-
-            const classId =
-                scoreOpen > scoreClosed ? 1 : 0;
+            const classId = openScore > closedScore ? 0 : 1;
 
             boxes.push({
-
                 x: x - w / 2,
                 y: y - h / 2,
-
-                width: w,
-                height: h,
-
+                w,
+                h,
                 score,
                 classId
             });
         }
-
-        const finalBoxes =
-            nonMaxSuppression(boxes);
-
-        drawBoxes(finalBoxes);
-
-    } catch (err) {
-
-        console.error(err);
     }
 
-    requestAnimationFrame(detectFrame);
+    const finalBoxes = nms(boxes, IOU_THRESHOLD);
+
+    ctxOverlay.clearRect(0, 0, overlay.width, overlay.height);
+
+    let detectedOpen = false;
+
+    finalBoxes.forEach(box => {
+
+        const state = CLASS_MAP[box.classId];
+        const isOpen = state === "OPEN";
+
+        if (isOpen) detectedOpen = true;
+
+        const scaleX = overlay.width / TARGET_SIZE;
+        const scaleY = overlay.height / TARGET_SIZE;
+
+        const x = box.x * scaleX;
+        const y = box.y * scaleY;
+        const w = box.w * scaleX;
+        const h = box.h * scaleY;
+
+        const color = isOpen ? '#ef4444' : '#22c55e';
+
+        const label = isOpen
+            ? `DOOR OPEN ${(box.score * 100).toFixed(1)}%`
+            : `DOOR CLOSED ${(box.score * 100).toFixed(1)}%`;
+
+        ctxOverlay.strokeStyle = color;
+        ctxOverlay.lineWidth = 4;
+        ctxOverlay.strokeRect(x, y, w, h);
+
+        ctxOverlay.fillStyle = color;
+        ctxOverlay.fillRect(x, y - 30, 220, 30);
+
+        ctxOverlay.fillStyle = '#fff';
+        ctxOverlay.font = 'bold 18px Arial';
+        ctxOverlay.fillText(label, x + 10, y - 8);
+    });
+
+    // ================= STATE =================
+    if (finalBoxes.length > 0) {
+
+        if (detectedOpen) {
+
+            statusPanel.innerText = "🚨 DOOR IS OPEN";
+            statusPanel.style.background = "#450a0a";
+            statusPanel.style.borderColor = "#ef4444";
+
+            if (currentState !== "OPEN") {
+                alarmSound.play();
+                captureFrame("🚨 Door Open Detected");
+                currentState = "OPEN";
+            }
+
+        } else {
+
+            statusPanel.innerText = "✅ DOOR CLOSED";
+            statusPanel.style.background = "#052e16";
+            statusPanel.style.borderColor = "#22c55e";
+
+            currentState = "CLOSED";
+        }
+
+    } else {
+
+        statusPanel.innerText = "WAITING FOR DOOR";
+        statusPanel.style.background = "#1e293b";
+        statusPanel.style.borderColor = "#334155";
+
+        currentState = "WAITING";
+    }
+
+    requestAnimationFrame(processFrame);
 }
