@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<h1>Smart Door Monitoring</h1>
+<div class="title">
+<h1>AI Door Security Monitor</h1>
 <p>
-AI pendeteksi pintu terbuka dan tertutup secara realtime menggunakan webcam dan YOLO ONNX.
+Realtime monitoring pintu menggunakan YOLO ONNX dan webcam detection system.
 </p>
 </div>
 
@@ -11,33 +12,39 @@ AKTIFKAN SISTEM
 
 </div>
 
-<div class="status-card">
-<div class="status-title">SYSTEM STATUS</div>
-<div id="status-panel" class="status-text">
+<div class="status-box">
+<div class="status-label">LIVE STATUS</div>
+<div id="status-panel">
 SYSTEM OFFLINE
 </div>
 </div>
 
-<div class="grid">
+<div class="dashboard">
 
-<div class="camera-card">
-<div class="card-title">LIVE CCTV MONITOR</div>
+<div class="card">
+<div class="card-title">Live Camera</div>
 
 <div class="camera-container">
-
-<div class="scan-line"></div>
 
 <video id="webcam" autoplay playsinline muted></video>
 
 <canvas id="overlay" width="640" height="480"></canvas>
 
+<div class="camera-overlay">
+<div class="corner"></div>
+<div class="corner"></div>
+<div class="corner"></div>
+<div class="corner"></div>
+</div>
+
 </div>
 </div>
 
-<div class="log-card">
-<div class="card-title">EVENT LOG</div>
+<div class="card">
+<div class="card-title">Detection Log</div>
 
-<div id="log-panel" class="log-panel">
+<div id="log-panel" class="log-panel"></div>
+
 </div>
 
 </div>
@@ -45,12 +52,10 @@ SYSTEM OFFLINE
 </div>
 
 <div class="footer">
-DoorGuard AI Security System • YOLO ONNX Detection
+DoorGuard AI Security System
 </div>
 
-</div>
-
-<canvas id="processor" width="640" height="640" style="display:none;"></canvas>
+<canvas id="processor" width="640" height="640" style="display:none"></canvas>
 
 <script src="app.js"></script>
 
