@@ -1,61 +1,170 @@
 <!DOCTYPE html>
-<div class="title">
-<h1>AI Door Security Monitor</h1>
-<p>
-Realtime monitoring pintu menggunakan YOLO ONNX dan webcam detection system.
-</p>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Smart Door State Detection</title>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:#0f172a;
+    color:white;
+    font-family:Arial, Helvetica, sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+}
+
+h1{
+    font-size:40px;
+    margin-bottom:5px;
+}
+
+.sub{
+    color:#94a3b8;
+    margin-bottom:20px;
+}
+
+button{
+    padding:14px 30px;
+    border:none;
+    border-radius:12px;
+    background:#2563eb;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.3s;
+    margin-bottom:20px;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+.status{
+    width:100%;
+    max-width:900px;
+    padding:20px;
+    border-radius:16px;
+    font-size:28px;
+    font-weight:bold;
+    text-align:center;
+    margin-bottom:20px;
+    border:3px solid #334155;
+    background:#1e293b;
+}
+
+.container{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    justify-content:center;
+}
+
+.camera-box{
+    position:relative;
+    width:900px;
+    max-width:100%;
+}
+
+video,
+canvas{
+    width:100%;
+    border-radius:20px;
+}
+
+#overlay{
+    position:absolute;
+    left:0;
+    top:0;
+}
+
+.log-box{
+    width:320px;
+    height:675px;
+    overflow:auto;
+    background:#111827;
+    border-radius:20px;
+    padding:15px;
+    border:2px solid #334155;
+}
+
+.log-title{
+    text-align:center;
+    margin-bottom:15px;
+    font-size:22px;
+}
+
+.log-item{
+    background:#1e293b;
+    border-radius:14px;
+    overflow:hidden;
+    margin-bottom:15px;
+    border:2px solid #334155;
+}
+
+.log-item img{
+    width:100%;
+}
+
+.log-item p{
+    padding:10px;
+    text-align:center;
+    font-size:14px;
+}
+
+.footer{
+    margin-top:25px;
+    color:#94a3b8;
+}
+
+.footer span{
+    color:#60a5fa;
+    font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<h1>🚪 Smart Door State Detection</h1>
+<p class="sub">Edge AI Door Monitoring System</p>
+
+<button id="btn-init">START SYSTEM</button>
+
+<div class="status" id="status-panel">
+    SYSTEM OFFLINE
 </div>
 
-<button id="btn-init" class="btn-init">
-AKTIFKAN SISTEM
-</button>
+<div class="container">
+
+    <div class="camera-box">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="overlay" width="640" height="480"></canvas>
+    </div>
+
+    <div class="log-box" id="log-panel">
+        <h2 class="log-title">📋 Door Activity Log</h2>
+    </div>
 
 </div>
 
-<div class="status-box">
-<div class="status-label">LIVE STATUS</div>
-<div id="status-panel">
-SYSTEM OFFLINE
-</div>
-</div>
-
-<div class="dashboard">
-
-<div class="card">
-<div class="card-title">Live Camera</div>
-
-<div class="camera-container">
-
-<video id="webcam" autoplay playsinline muted></video>
-
-<canvas id="overlay" width="640" height="480"></canvas>
-
-<div class="camera-overlay">
-<div class="corner"></div>
-<div class="corner"></div>
-<div class="corner"></div>
-<div class="corner"></div>
-</div>
-
-</div>
-</div>
-
-<div class="card">
-<div class="card-title">Detection Log</div>
-
-<div id="log-panel" class="log-panel"></div>
-
-</div>
-
-</div>
-
-</div>
+<canvas id="processor" width="640" height="640" style="display:none;"></canvas>
 
 <div class="footer">
-DoorGuard AI Security System
+    Built by <span>Ramadhirra Azzahra Putri</span>
 </div>
-
-<canvas id="processor" width="640" height="640" style="display:none"></canvas>
 
 <script src="app.js"></script>
 
